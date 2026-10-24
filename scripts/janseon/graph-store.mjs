@@ -25,8 +25,8 @@ SOFTWARE.
 */
 
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { canonicalEncode, semanticDigest } from "./canonical.mjs";
+import { assertStoreSchema, initializeStoreSchema } from "./store-schema.mjs";
 
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const fail = (code, detail) => { throw Object.assign(new Error(detail ? `${code}: ${detail}` : code), { code }); };
@@ -538,9 +538,6 @@ function nested(rows, excludedOrdinal, skippedOrdinal, expected) {
   return matches.map((row) => row.value);
 }
 
-const SCHEMA_SQL = readFileSync(new URL("./graph-schema.sql", import.meta.url), "utf8");
-const SCHEMA_OBJECTS = [...SCHEMA_SQL.matchAll(/CREATE (TABLE|TRIGGER) (map_graph_\w+)[\s\S]*?(?:\) STRICT;|END;)/g)]
-  .map(([sql, type, name]) => ({ type: type.toLowerCase(), name, sql: sql.slice(0, -1) }));
 const BINDING_KEYS = ["dataset_id","edition_id","schema_contract","projection_contract","source_schema","expected_source_sha256","expected_document_sha256","expected_byte_length","source_package_content_id","source_authentication_receipt_sha256","source_revision","source_reader_sha256","source_schema_sha256","field_disposition_sha256","game_source_manifest_sha256","rights_receipt_content_id"];
 const RECEIPT_KEYS = ["singleton", "actor", "reason", "source_sha256", "document_sha256", "byte_length"];
 const INITIAL_SOURCE = "46985afccc2d3f2b5e4e3152254d30bc023d0688d63745a951a9be0f6ebf097d";
@@ -639,17 +636,12 @@ function namespaceRows(rows, binding) {
   return rows;
 }
 
-function connectionBoundary(db) {
-  if (db.prepare("PRAGMA database_list").all().some(row => row.name !== "main" && row.name !== "temp")
-      || db.prepare("SELECT count(*) AS n FROM sqlite_temp_schema").get().n !== 0) fail("E_GRAPH_SCHEMA", "attached or temporary schema");
-  if (db.prepare("PRAGMA foreign_keys").get().foreign_keys !== 1) fail("E_GRAPH_SCHEMA", "foreign keys disabled");
-}
-
-function schemaBoundary(db) {
-  connectionBoundary(db);
-  const actual = db.prepare("SELECT type, name, sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name").all();
-  const expected = SCHEMA_OBJECTS.toSorted((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-  if (canonicalEncode(actual.map(row => ({ ...row }))) !== canonicalEncode(expected)) fail("E_GRAPH_SCHEMA", "schema drift");
+function schemaBoundary(db, mode) {
+  if (!["janseon-graph-store.v1", "janseon-central-store.v1"].includes(mode)) fail("E_GRAPH_SCHEMA", "unsupported schema mode");
+  try { assertStoreSchema(db, mode); } catch (error) {
+    if (error.code === "E_STORE_SCHEMA") fail("E_GRAPH_SCHEMA", error.message);
+    throw error;
+  }
 }
 
 function transaction(db, action) {
@@ -686,14 +678,14 @@ function validateRows(rows, document, binding, receipt) {
 
 /** Install the fixed schema only. No caller SQL or source database is accepted. */
 export function initializeGraphStore(db) {
-  if (!db.isTransaction) db.exec("PRAGMA foreign_keys=ON");
-  connectionBoundary(db);
-  if (db.prepare("SELECT count(*) AS n FROM sqlite_schema").get().n) fail("E_GRAPH_SCHEMA", "database is not empty");
-  transaction(db, () => { db.exec(SCHEMA_SQL); schemaBoundary(db); });
+  try { initializeStoreSchema(db, "janseon-graph-store.v1"); } catch (error) {
+    if (error.code === "E_STORE_SCHEMA") fail("E_GRAPH_SCHEMA", error.message);
+    throw error;
+  }
 }
 
 /** The caller authenticates expectedBinding independently of document and sourceReceipt. */
-export function importGraphEdition(db, options) {
+export function importGraphEdition(db, options, schemaMode = "janseon-graph-store.v1") {
   exactRecord(options, ["document", "sourceReceipt", "expectedBinding"], "import options");
   const { document, sourceReceipt, expectedBinding: binding } = options;
   validateBinding(binding); validateReceipt(sourceReceipt, binding);
@@ -701,7 +693,7 @@ export function importGraphEdition(db, options) {
   const rows = documentRows(document, binding, sourceReceipt);
   validateRows(rows, document, binding, sourceReceipt);
   return transaction(db, () => {
-    schemaBoundary(db);
+    schemaBoundary(db, schemaMode);
     insertRow(db, "map_graph_binding", binding);
     // Root precedes the import receipt because both are scoped to this edition.
     for (const table of ["map_graph_root", ...GRAPH_TABLES.filter(table => table !== "map_graph_root")]) {
@@ -709,18 +701,18 @@ export function importGraphEdition(db, options) {
     }
     const graphSemanticSha256 = semanticDigest(graphSemanticProjection({ datasetId: binding.dataset_id, editionId: binding.edition_id, document }));
     insertRow(db, "map_graph_seal", { dataset_id: binding.dataset_id, edition_id: binding.edition_id, graph_semantic_sha256: graphSemanticSha256 });
-    readGraphEdition(db, { datasetId: binding.dataset_id, editionId: binding.edition_id, expectedBinding: binding });
+    readGraphEdition(db, { datasetId: binding.dataset_id, editionId: binding.edition_id, expectedBinding: binding }, schemaMode);
     return { datasetId: binding.dataset_id, editionId: binding.edition_id, graphSemanticSha256 };
   });
 }
 
 /** SELECT-only typed read. No source file/archive fallback and no publication approval. */
-export function readGraphEdition(db, options) {
+export function readGraphEdition(db, options, schemaMode = "janseon-graph-store.v1") {
   exactRecord(options, ["datasetId", "editionId", "expectedBinding"], "read options");
   const { datasetId, editionId, expectedBinding: binding } = options;
   validateBinding(binding);
   if (datasetId !== binding.dataset_id || editionId !== binding.edition_id) fail("E_GRAPH_BINDING", "requested edition");
-  schemaBoundary(db);
+  schemaBoundary(db, schemaMode);
   const bindings = db.prepare("SELECT * FROM map_graph_binding WHERE dataset_id=? AND edition_id=?").all(datasetId, editionId);
   if (bindings.length !== 1 || canonicalEncode({ ...bindings[0] }) !== canonicalEncode(binding)) fail("E_GRAPH_BINDING", "stored binding");
   if (db.prepare("PRAGMA foreign_key_check").all().length
