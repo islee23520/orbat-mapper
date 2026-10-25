@@ -22,14 +22,14 @@ function boundaryError(error) {
 }
 
 // Only these two synchronous central operations use this private scope helper.
-function transaction(db, write, action) {
+function transaction(db, write, action, mode = MODE) {
   const started = !db.isTransaction;
   const savepoint = write ? "map_central_import" : "map_central_read";
   if (started) db.exec(write ? "BEGIN IMMEDIATE" : "BEGIN");
   let saved = false;
   try {
     db.exec("SAVEPOINT " + savepoint); saved = true;
-    assertStoreSchema(db, MODE); // Main sqlite_schema SELECT establishes the read snapshot.
+    assertStoreSchema(db, mode); // Main sqlite_schema SELECT establishes the read snapshot.
     const result = action();
     db.exec(started ? "COMMIT" : "RELEASE " + savepoint);
     return result;
@@ -48,31 +48,31 @@ export function initializeCentralStore(db) {
 }
 
 /** Both imports and their ordinary typed readbacks commit or roll back together. */
-export function importCentralEditions(db, options) {
+export function importCentralEditions(db, options, mode = MODE) {
   pair(options);
   return transaction(db, true, () => {
-    const graph = importGraphEdition(db, options.graph, MODE);
-    const observedGeography = importObservedGeographyEdition(db, options.observedGeography, MODE);
+    const graph = importGraphEdition(db, options.graph, mode);
+    const observedGeography = importObservedGeographyEdition(db, options.observedGeography, mode);
     readCentralSnapshot(db, {
       graph: { datasetId: graph.datasetId, editionId: graph.editionId, expectedBinding: options.graph.expectedBinding },
       observedGeography: { datasetId: observedGeography.datasetId, editionId: observedGeography.editionId,
         expectedBinding: options.observedGeography.expectedBinding },
-    });
+    }, mode);
     return { schema: "janseon-central-import.v1", graph, observedGeography };
-  });
+  }, mode);
 }
 
 /** One SQLite snapshot of an explicitly pinned pair; not approval of that pair. */
-export function readCentralSnapshot(db, options) {
+export function readCentralSnapshot(db, options, mode = MODE) {
   pair(options);
   return transaction(db, false, () => {
-    const graph = readGraphEdition(db, options.graph, MODE);
-    const observedGeography = readObservedGeographyEdition(db, options.observedGeography, MODE);
+    const graph = readGraphEdition(db, options.graph, mode);
+    const observedGeography = readObservedGeographyEdition(db, options.observedGeography, mode);
     const centralSemanticSha256 = semanticDigest({ schema: "janseon-central-semantic.v1",
       graph: { datasetId: graph.datasetId, editionId: graph.editionId, semanticSha256: graph.graphSemanticSha256 },
       observedGeography: { datasetId: observedGeography.datasetId, editionId: observedGeography.editionId,
         semanticSha256: observedGeography.observedGeographySemanticSha256 },
     });
     return { schema: "janseon-central-snapshot.v1", graph, observedGeography, centralSemanticSha256 };
-  });
+  }, mode);
 }

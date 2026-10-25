@@ -39,7 +39,7 @@ function schemaObjects(source) {
     offset += trivia.length;
     if (offset === source.length) break;
     const start = offset;
-    const header = /^CREATE (TABLE|TRIGGER) (map_(?:graph|observed)_\w+)\b/.exec(source.slice(offset));
+    const header = /^CREATE (TABLE|TRIGGER) (map_(?:graph|observed|command)_\w+)\b/.exec(source.slice(offset));
     if (!header) fail("unsupported DDL at offset " + offset);
     const [, type, name] = header;
     if (names.has(name)) fail("duplicate schema object " + name);
@@ -62,11 +62,11 @@ function schemaObjects(source) {
       if (char !== ";" || depth !== 0) continue;
       const sql = source.slice(start, offset);
       if (type === "TABLE") {
-        if (!/^CREATE TABLE \w+ \([\s\S]*\) STRICT$/.test(sql)) fail("unsupported table DDL " + name);
+        if (!/^CREATE TABLE \w+ \([\s\S]*\) STRICT(?:, WITHOUT ROWID)?$/.test(sql)) fail("unsupported table DDL " + name);
       } else {
-        const prefix = /^CREATE TRIGGER \w+\s+BEFORE (?:INSERT|UPDATE|DELETE) ON map_(?:graph|observed)_\w+\s+(?:WHEN [\s\S]+?\s+)?BEGIN SELECT RAISE\(ABORT, '(?:[^']|'')*'\)/;
+        const prefix = /^CREATE TRIGGER \w+\s+BEFORE (?:INSERT|UPDATE|DELETE) ON map_(?:graph|observed|command)_\w+\s+(?:WHEN [\s\S]+?\s+)?BEGIN SELECT RAISE\(ABORT, '(?:[^']|'')*'\)/;
         if (prefix.test(sql) && !sql.endsWith("END")) continue; // RAISE statement's semicolon.
-        if (!/^CREATE TRIGGER \w+\s+BEFORE (?:INSERT|UPDATE|DELETE) ON map_(?:graph|observed)_\w+\s+(?:WHEN [^;]+\s+)?BEGIN SELECT RAISE\(ABORT, '(?:[^']|'')*'\); END$/.test(sql)) fail("unsupported trigger DDL " + name);
+        if (!/^CREATE TRIGGER \w+\s+BEFORE (?:INSERT|UPDATE|DELETE) ON map_(?:graph|observed|command)_\w+\s+(?:WHEN [^;]+\s+)?BEGIN SELECT RAISE\(ABORT, '(?:[^']|'')*'\); END$/.test(sql)) fail("unsupported trigger DDL " + name);
       }
       objects.push({ type: type.toLowerCase(), name, sql });
       offset++;
@@ -84,6 +84,8 @@ const OBSERVED_SQL = readFileSync(new URL("./observed-geography-schema.sql", imp
 const GRAPH_OBJECTS = schemaObjects(GRAPH_SQL);
 const OBSERVED_OBJECTS = schemaObjects(OBSERVED_SQL);
 const UNION_OBJECTS = [...GRAPH_OBJECTS, ...OBSERVED_OBJECTS];
+const COMMAND_SQL = readFileSync(new URL("./command-schema.sql", import.meta.url), "utf8");
+const COMMAND_OBJECTS = [...UNION_OBJECTS, ...schemaObjects(COMMAND_SQL)];
 if (new Set(UNION_OBJECTS.map(row => row.name)).size !== UNION_OBJECTS.length) fail("duplicate union object");
 const encode = objects => canonicalEncode(objects.toSorted((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 const GRAPH_EXPECTED = encode(GRAPH_OBJECTS), OBSERVED_EXPECTED = encode(OBSERVED_OBJECTS), UNION_EXPECTED = encode(UNION_OBJECTS);
@@ -93,6 +95,7 @@ function expected(mode) {
     case "janseon-graph-store.v1": return GRAPH_EXPECTED;
     case "janseon-observed-geography-store.v1": return OBSERVED_EXPECTED;
     case "janseon-central-store.v1": return UNION_EXPECTED;
+    case "janseon-command-store.v1": return encode(COMMAND_OBJECTS);
     default: fail("unsupported schema mode");
   }
 }
@@ -124,6 +127,7 @@ export function initializeStoreSchema(db, mode) {
     db.exec("SAVEPOINT map_schema_install"); savepoint = true;
     if (mode !== "janseon-observed-geography-store.v1") db.exec(GRAPH_SQL);
     if (mode !== "janseon-graph-store.v1") db.exec(OBSERVED_SQL);
+    if (mode === "janseon-command-store.v1") db.exec(COMMAND_SQL);
     assertStoreSchema(db, mode);
     db.exec(started ? "COMMIT" : "RELEASE map_schema_install");
   } catch (error) {
