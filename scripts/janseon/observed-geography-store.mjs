@@ -381,7 +381,7 @@ function boundProjection(rows, binding) {
 }
 
 function schemaBoundary(db, mode) {
-  if (!["janseon-observed-geography-store.v1", "janseon-central-store.v1"].includes(mode)) fail("E_OBSERVED_SCHEMA", "unsupported schema mode");
+  if (!["janseon-observed-geography-store.v1", "janseon-central-store.v1", "janseon-command-store.v1"].includes(mode)) fail("E_OBSERVED_SCHEMA", "unsupported schema mode");
   try { assertStoreSchema(db, mode); } catch (error) {
     if (error.code === "E_STORE_SCHEMA") fail("E_OBSERVED_SCHEMA", error.message);
     throw error;
