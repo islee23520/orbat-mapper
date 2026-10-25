@@ -2,7 +2,7 @@ import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { canonicalEncode, semanticDigest } from "./canonical.mjs";
-import { exportCommandLog, readCommandEdition, replayCommandLog } from "./command-store.mjs";
+import { exportCommandLog, prepareCommandLog, readCommandEdition, replayCommandLog } from "./command-store.mjs";
 
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const exact = (value, keys) => {
@@ -17,7 +17,7 @@ const json = path => { const value = JSON.parse(readFileSync(absolute(path), "ut
 let db;
 try {
   const [action, ...args] = process.argv.slice(2);
-  const expected = action === "export" ? ["--request"] : action === "apply" ? ["--request", "--authoritative-store"] : [];
+  const expected = ["export", "package"].includes(action) ? ["--request"] : action === "apply" ? ["--request", "--authoritative-store"] : [];
   const flags = new Map();
   for (let i = 0; i < args.length; i += 2) {
     if (!expected.includes(args[i]) || flags.has(args[i]) || !args[i + 1]) fail("USAGE");
@@ -25,12 +25,13 @@ try {
   }
   if (!expected.length || flags.size !== expected.length) fail("USAGE");
   const request = json(flags.get("--request"));
-  if (action === "export") {
-    exact(request, ["schema", "cloneStore", "bindingPath", "outputPath"]);
-    if (request.schema !== "janseon-command-export-request.v1") fail("INVALID_REQUEST");
+  if (["export", "package"].includes(action)) {
+    exact(request, ["schema", "cloneStore", "bindingPath", "outputPath", ...(action === "package" ? ["commandPath", "reviewPath"] : [])]);
+    if (request.schema !== (action === "package" ? "janseon-command-package-request.v1" : "janseon-command-export-request.v1")) fail("INVALID_REQUEST");
     const binding = json(request.bindingPath), cloneStore = realpathSync(absolute(request.cloneStore));
     db = new DatabaseSync(cloneStore, { readOnly: true }); db.exec("PRAGMA foreign_keys=ON; PRAGMA query_only=ON");
-    const log = exportCommandLog(db, binding);
+    const log = action === "package" ? prepareCommandLog(db, { binding,
+      commandPackage: json(request.commandPath), review: json(request.reviewPath) }) : exportCommandLog(db, binding);
     const transport = { schema: "janseon-command-transport.v1", log, sha256: semanticDigest(log) };
     // Exclusive output prevents silently replacing a binding, store or package.
     writeFileSync(absolute(request.outputPath), canonicalEncode(transport) + "\n", { flag: "wx" });

@@ -126,6 +126,19 @@ export function exportCommandLog(db, binding) {
   });
 }
 
+/** Read-only package preparation; review remains an independent caller input. */
+export function prepareCommandLog(db, { binding, commandPackage, review }) {
+  return transaction(db, false, () => {
+    const state = current(db, binding);
+    applyAuthoringCommands(commandPackage, { ...state.context, review });
+    if (state.accepted.has(commandPackage.operationId)) fail("E_COMMAND_REPLAY");
+    const commands = db.prepare("SELECT command_json,review_json FROM map_command_log WHERE dataset_id=? ORDER BY sequence")
+      .all(state.context.authored.datasetId).map(row => ({ commandPackage: JSON.parse(row.command_json), review: JSON.parse(row.review_json) }));
+    return { schema: "janseon-command-log.v1", contextSha256: state.contextSha256,
+      commands: [...commands, { commandPackage, review }] };
+  });
+}
+
 /** Each accepted package is atomic; ordered replay fails on a stale/tampered entry. */
 export function replayCommandLog(db, { binding, package: exported }) {
   if (exported?.schema !== "janseon-command-log.v1" || !Array.isArray(exported.commands)
