@@ -33,6 +33,7 @@ const ChartEditView = () => import("@/modules/scenarioeditor/ChartEditView.vue")
 const ScenarioEditorMaplibre = () =>
   import("@/modules/maplibreview/ScenarioEditorMaplibre.vue");
 export const routes = [
+  { path: "/seoul/editor", name: "seoul-editor", component: () => import("@/janseon/JanseonPanel.vue") },
   {
     path: "/scenario/:scenarioId",
     props: true,
