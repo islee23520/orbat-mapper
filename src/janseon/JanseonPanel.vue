@@ -4,7 +4,7 @@ import { useClipboard } from "@vueuse/core";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { loadReadSnapshot, previewEntity, type ReadSnapshot } from "./editorReadModel";
-import JanseonCommandSubmit from "./JanseonCommandSubmit.vue";
+import JanseonDraftEditor from "./JanseonDraftEditor.vue";
 const emit = defineEmits<{ settled: [] }>();
 
 const snapshot = ref<ReadSnapshot>();
@@ -65,7 +65,7 @@ function label(row: unknown, index: number) {
           <Card class="min-w-0"><CardHeader><CardTitle>Command preview</CardTitle></CardHeader><CardContent class="space-y-4"><p class="text-muted-foreground text-xs">Unreviewed, unchanged-value entity.update example. Not accepted or applied. A real operation ID and review are required elsewhere.</p><pre v-if="command" data-testid="command-preview" class="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs leading-5">{{ JSON.stringify(command, null, 2) }}</pre><p v-else class="text-muted-foreground text-sm">Preview unavailable for this reference kind. Select an authored entity.</p><Button data-testid="copy-preview" :disabled="!command" @click="command && copy(JSON.stringify(command, null, 2))">{{ copied ? 'Copied preview' : 'Copy command JSON' }}</Button></CardContent></Card>
         </div>
       </div>
-      <JanseonCommandSubmit v-if="snapshot" :command="command" />
+      <JanseonDraftEditor v-if="snapshot" :snapshot="snapshot" :entity="category === 'entities' ? detail as ReadSnapshot['authored']['entities'][number] : null" />
       <div v-else-if="!loading" class="text-muted-foreground rounded-lg border border-dashed p-8 text-center">No snapshot loaded. Choose the three PR9 read-model files and an expected generation.</div>
       <footer class="text-muted-foreground border-t pt-4 text-xs">Physical rail / legacy atlas: UNSET — typed source coverage unavailable. No geometry fallback. Only the merged CLI writes authoritative state.</footer>
     </div>
