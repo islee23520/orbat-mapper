@@ -74,6 +74,15 @@ export function readCommandEdition(db, binding) {
   });
 }
 
+/** Complete typed release inputs from one verified ledger/central read snapshot. */
+export function readCommandReleaseSource(db, binding) {
+  return transaction(db, false, () => {
+    const { context } = current(db, binding);
+    return { central: context.central, authored: context.authored,
+      identitySnapshotSha256: context.identitySnapshotSha256 };
+  });
+}
+
 /** Owns one write transaction: validate current references, append, CAS, commit. */
 export function acceptCommandPackage(db, { binding, commandPackage, review }) {
   return transaction(db, true, () => {
