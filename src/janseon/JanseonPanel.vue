@@ -4,6 +4,7 @@ import { useClipboard } from "@vueuse/core";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { loadReadSnapshot, previewEntity, type ReadSnapshot } from "./editorReadModel";
+import JanseonCommandSubmit from "./JanseonCommandSubmit.vue";
 const emit = defineEmits<{ settled: [] }>();
 
 const snapshot = ref<ReadSnapshot>();
@@ -42,7 +43,7 @@ function label(row: unknown, index: number) {
   <main class="bg-background text-foreground min-h-screen px-4 py-8 sm:px-8">
     <div class="mx-auto max-w-7xl space-y-6">
       <header class="flex flex-wrap items-start justify-between gap-4 border-b pb-6">
-        <div><p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Seoul · canonical references</p><h1 class="mt-2 text-3xl font-semibold">Map edition inspector</h1><p class="text-muted-foreground mt-2">Read-only source facts. Preview commands; never apply them here.</p></div>
+        <div><p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Seoul · canonical references</p><h1 class="mt-2 text-3xl font-semibold">Map edition inspector</h1><p class="text-muted-foreground mt-2">Read-only source facts. Submit reviewed commands through the operator CLI.</p></div>
         <span class="rounded-full border px-3 py-1 text-xs font-semibold">READ ONLY</span>
       </header>
       <Card><CardHeader><CardTitle>Open a pinned snapshot</CardTitle></CardHeader><CardContent class="space-y-3">
@@ -64,8 +65,9 @@ function label(row: unknown, index: number) {
           <Card class="min-w-0"><CardHeader><CardTitle>Command preview</CardTitle></CardHeader><CardContent class="space-y-4"><p class="text-muted-foreground text-xs">Unreviewed, unchanged-value entity.update example. Not accepted or applied. A real operation ID and review are required elsewhere.</p><pre v-if="command" data-testid="command-preview" class="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs leading-5">{{ JSON.stringify(command, null, 2) }}</pre><p v-else class="text-muted-foreground text-sm">Preview unavailable for this reference kind. Select an authored entity.</p><Button data-testid="copy-preview" :disabled="!command" @click="command && copy(JSON.stringify(command, null, 2))">{{ copied ? 'Copied preview' : 'Copy command JSON' }}</Button></CardContent></Card>
         </div>
       </div>
+      <JanseonCommandSubmit v-if="snapshot" :command="command" />
       <div v-else-if="!loading" class="text-muted-foreground rounded-lg border border-dashed p-8 text-center">No snapshot loaded. Choose the three PR9 read-model files and an expected generation.</div>
-      <footer class="text-muted-foreground border-t pt-4 text-xs">Physical rail / legacy atlas: UNSET — typed source coverage unavailable. No geometry fallback. Clipboard export only; no save, apply or publish action.</footer>
+      <footer class="text-muted-foreground border-t pt-4 text-xs">Physical rail / legacy atlas: UNSET — typed source coverage unavailable. No geometry fallback. Only the merged CLI writes authoritative state.</footer>
     </div>
   </main>
 </template>
