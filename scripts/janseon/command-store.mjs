@@ -83,6 +83,15 @@ export function readCommandReleaseSource(db, binding) {
   });
 }
 
+/** Editor head and typed references share the same verified read transaction. */
+export function readCommandEditorSource(db, binding) {
+  return transaction(db, false, () => {
+    const { context, head } = current(db, binding);
+    return { central: context.central, authored: context.authored,
+      identitySnapshotSha256: context.identitySnapshotSha256, head: { ...head } };
+  });
+}
+
 /** Owns one write transaction: validate current references, append, CAS, commit. */
 export function acceptCommandPackage(db, { binding, commandPackage, review }) {
   return transaction(db, true, () => {
