@@ -79,7 +79,12 @@ export function buildMapRelease({ databasePath, binding, provenance, context, li
   }
   const specs = projections(source), members = {}, memberOrigins = [];
   const metadata = specs.map(([path, kind, editionRefs, value]) => {
-    const data = bytes(value); members[path] = data;
+    // Native graph aliases are ordered source entries in graph semantics.
+    // Canonical object-key sorting destroys that order. Preserve the validated
+    // source document's JSON order for both graph transport members only.
+    const data = ["wiki/map-core.json", "game/world-graph.json"].includes(path)
+      ? Buffer.from(JSON.stringify(value) + "\n") : bytes(value);
+    members[path] = data;
     memberOrigins.push({ path, rawSha256: hash(data), sources: expectedRows.filter(row => editionRefs.some(r => canonicalEncode(r) === canonicalEncode(row.editionRef))) });
     return { path, target: path.split("/")[0], kind, sizeBytes: data.length, rawSha256: hash(data),
       visibility: "public", license, identitySnapshotSha256: source.identitySnapshotSha256, editionRefs };
