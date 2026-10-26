@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync, existsSync } from "node:fs";
+import { spawn, execFileSync } from "node:child_process";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync, existsSync, cpSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fixture, command } from "./command-store-fixture.mjs";
-import { acceptCommandPackage, readCommandReleaseSource, exportCommandLog, prepareCommandLog } from "./command-store.mjs";
+import { acceptCommandPackage, readCommandReleaseSource, exportCommandLog, prepareCommandLog, withCommandReleaseCheckpoint } from "./command-store.mjs";
 import { semanticDigest } from "./canonical.mjs";
 import { buildMapRelease } from "./build-map-release.mjs";
 const cli = new URL("./build-checkpoint-release.mjs", import.meta.url).pathname;
@@ -35,7 +35,7 @@ function setup(t) {
 function run(f, name, nodeArgs = []) {
   const output = join(f.directory, name);
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [...nodeArgs, cli, "--request", f.requestPath, "--authoritative-store", f.databasePath, "--output-dir", output], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, [...nodeArgs, f.cli ?? cli, "--request", f.requestPath, "--authoritative-store", f.databasePath, "--output-dir", output, ...(f.repository ? ["--require-main", f.repository] : [])], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "", stderr = "";
     child.stdout.on("data", b => { stdout += b; }); child.stderr.on("data", b => { stderr += b; });
     child.once("error", reject); child.once("close", code => resolve({ code, output, record: JSON.parse(code === 0 ? stdout : stderr), stderr }));
@@ -107,4 +107,143 @@ test("WAL authority and caller-forged ledger provenance refuse without output", 
   f.db.exec("PRAGMA journal_mode=DELETE"); f.request.provenance.ledger = {};
   writeFileSync(f.requestPath, JSON.stringify(f.request));
   const forged = await run(f, "forged"); assert.equal(forged.record.code, "INVALID_REQUEST"); assert.equal(existsSync(forged.output), false);
+});
+
+function mainFixture(t) {
+  const f = setup(t), repository = join(f.directory, "repository"), runtime = join(f.directory, "runtime");
+  mkdirSync(repository);
+  const git = (args, input) => execFileSync("git", ["-C", repository, ...args], { input, encoding: "utf8",
+    env: { ...process.env, GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.test",
+      GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.test",
+      GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z" } }).trim();
+  git(["init", "--initial-branch=main"]);
+  git(["remote", "add", "origin", "https://github.com/islee23520/orbat-mapper.git"]);
+  const tree = git(["mktree"], ""), base = git(["commit-tree", tree], "base\n");
+  const commit = parent => git(["commit-tree", tree, "-p", parent], "accepted\n");
+  const main = commit(base); git(["update-ref", "refs/heads/main", main]);
+  cpSync(new URL("./", import.meta.url), runtime, { recursive: true });
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  // Only the disposable runtime has fixture trust enrollment. Shipped registry stays empty.
+  writeFileSync(join(runtime, "trusted-main-recorders.json"), JSON.stringify({ fixture: publicKey.export({ type: "spki", format: "pem" }) }));
+  const keyPath = join(f.directory, "key.pem"), bindingPath = join(f.directory, "binding.json"), acceptancePath = join(f.directory, "acceptance.json");
+  writeFileSync(keyPath, privateKey.export({ type: "pkcs8", format: "pem" }), { mode: 0o600 });
+  writeFileSync(bindingPath, JSON.stringify(f.binding));
+  const ledger = withCommandReleaseCheckpoint(f.db, f.binding, value => value);
+  const acceptance = { schema: "janseon-main-acceptance-request.v1", recorder: "fixture", baseMain: base, mainCommit: main, previousReceipt: null, ledger };
+  const record = (nodeArgs = []) => {
+    writeFileSync(acceptancePath, JSON.stringify(acceptance));
+    return new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [...nodeArgs, join(runtime, "record-main-acceptance.mjs"), "--request", acceptancePath,
+        "--binding", bindingPath, "--repository", repository, "--authoritative-store", f.databasePath, "--signing-key", keyPath]);
+      let out = "", err = "";
+      child.stdout.on("data", b => { out += b; }); child.stderr.on("data", b => { err += b; });
+      child.once("error", reject); child.once("close", code => resolve({ code, result: JSON.parse(code === 0 ? out : err) }));
+    });
+  };
+  return { ...f, repository, cli: join(runtime, "build-checkpoint-release.mjs"), runtime, git, commit, main, base, ledger, acceptance, record };
+}
+
+test("trusted recorder binds local post-main tuple and actual checkpoint; caller sourceCommit is not proof", { timeout: 20000 }, async t => {
+  const f = mainFixture(t), recorded = await f.record();
+  assert.equal(recorded.code, 0);
+  const built = await run(f, "main-release");
+  assert.equal(built.code, 0, built.stderr);
+  assert.equal(built.record.mainAcceptance.receiptObject, recorded.result.receiptObject);
+  assert.equal(built.record.mainAcceptance.mainCommit, f.main);
+  assert.equal(built.record.mainAcceptance.ledgerSha256, semanticDigest(f.ledger));
+  assert.notEqual(f.request.provenance.sourceCommit, f.main);
+  assert.deepEqual(JSON.parse(readFileSync(join(built.output, "main-acceptance.json"))), built.record.mainAcceptance);
+  assert.equal(f.db.prepare("SELECT sequence FROM map_command_head").get().sequence, 1);
+});
+
+for (const fault of ["commit", "tuple", "merge-order", "recorder"]) test(`recorder rejects mismatched ${fault} without acceptance ref`, { timeout: 20000 }, async t => {
+  const f = mainFixture(t);
+  if (fault === "commit") f.acceptance.mainCommit = f.base;
+  if (fault === "tuple") f.acceptance.ledger.sequence++;
+  if (fault === "merge-order") f.acceptance.baseMain = f.main;
+  if (fault === "recorder") f.acceptance.recorder = "caller";
+  const result = await f.record();
+  assert.equal(result.code, 2);
+  assert.equal(result.result.code, { commit: "MAIN_COMMIT_MISMATCH", tuple: "MAIN_TUPLE_MISMATCH", "merge-order": "MAIN_MERGE_ORDER", recorder: "MAIN_RECORDER_UNTRUSTED" }[fault]);
+  assert.equal(f.git(["for-each-ref", "--format=%(objectname)", "refs/janseon/main-acceptance"]), "");
+});
+
+test("receipt CAS rejects a second clone candidate on the same base", { timeout: 20000 }, async t => {
+  const f = mainFixture(t);
+  const first = await f.record(); assert.equal(first.code, 0);
+  const second = await f.record(); assert.equal(second.result.code, "MAIN_RECEIPT_STALE");
+  assert.equal(f.git(["rev-parse", "refs/janseon/main-acceptance"]), first.result.receiptObject);
+});
+
+for (const change of ["main", "tuple"]) test(`checkpoint rejects stale accepted ${change} without output`, { timeout: 20000 }, async t => {
+  const f = mainFixture(t); assert.equal((await f.record()).code, 0);
+  if (change === "main") f.git(["update-ref", "refs/heads/main", f.commit(f.main)]);
+  else acceptCommandPackage(f.db, command(f.db, f.binding, "after-recording"));
+  const result = await run(f, "stale");
+  assert.equal(result.code, 2);
+  assert.equal(result.record.code, change === "main" ? "MAIN_RECEIPT_STALE" : "MAIN_TUPLE_MISMATCH");
+  assert.equal(existsSync(result.output), false);
+});
+
+for (const fault of ["missing", "unsigned", "untrusted", "tampered"]) test(`real checkpoint rejects ${fault} receipt, never trusting sourceCommit`, { timeout: 20000 }, async t => {
+  const f = mainFixture(t);
+  if (fault !== "missing") {
+    const recorded = await f.record(); assert.equal(recorded.code, 0);
+    const receipt = JSON.parse(f.git(["cat-file", "blob", recorded.result.receiptObject]));
+    if (fault === "unsigned") delete receipt.signature;
+    if (fault === "untrusted") receipt.payload.recorder = "caller";
+    if (fault === "tampered") receipt.payload.ledger.sequence++;
+    const oid = f.git(["hash-object", "-w", "--stdin"], JSON.stringify(receipt));
+    f.git(["update-ref", "refs/janseon/main-acceptance", oid]);
+  }
+  f.request.provenance.sourceCommit = f.main; writeFileSync(f.requestPath, JSON.stringify(f.request));
+  const result = await run(f, "forgery");
+  assert.equal(result.code, 2);
+  assert.equal(result.record.code, { missing: "MAIN_RECEIPT_MISSING", unsigned: "MAIN_RECEIPT_INVALID", untrusted: "MAIN_RECORDER_UNTRUSTED", tampered: "MAIN_SIGNATURE_INVALID" }[fault]);
+  assert.equal(existsSync(result.output), false);
+});
+
+test("live command writer excludes recorder and later changed tuple rejects its old request", { timeout: 20000 }, async t => {
+  const f = mainFixture(t);
+  f.db.exec("BEGIN IMMEDIATE");
+  try { assert.equal((await f.record()).result.code, "WRITER_LOCKED"); }
+  finally { f.db.exec("ROLLBACK"); }
+  acceptCommandPackage(f.db, command(f.db, f.binding, "changed-before-recording"));
+  assert.equal((await f.record()).result.code, "MAIN_TUPLE_MISMATCH");
+});
+
+for (const target of ["main", "receipt"]) test(`Git transaction rejects ${target} movement between verification and CAS`, { timeout: 20000 }, async t => {
+  const f = mainFixture(t), next = f.commit(f.main);
+  const blob = f.git(["hash-object", "-w", "--stdin"], "unsigned competitor\n");
+  const preload = `
+    import cp from 'node:child_process'; import {syncBuiltinESMExports} from 'node:module';
+    const original=cp.spawnSync; let changed=false;
+    cp.spawnSync=function(exe,args,options){
+      if(!changed && exe==='git' && args.includes('--stdin') && args.includes('update-ref')){
+        changed=true;
+        const result=original('git',['-C',${JSON.stringify(f.repository)},'update-ref',
+          ${JSON.stringify(target === "main" ? "refs/heads/main" : "refs/janseon/main-acceptance")},
+          ${JSON.stringify(target === "main" ? next : blob)}],{encoding:'utf8'});
+        if(result.status!==0) throw Error(result.stderr);
+      }
+      return original.call(this,exe,args,options);
+    };syncBuiltinESMExports();`;
+  const result = await f.record(["--import", "data:text/javascript," + encodeURIComponent(preload)]);
+  assert.equal(result.code, 2); assert.equal(result.result.code, "MAIN_GIT_CONFLICT");
+  assert.equal(f.git(["for-each-ref", "--format=%(objectname)", "refs/janseon/main-acceptance"]), target === "main" ? "" : blob);
+});
+
+test("next accepted tuple must follow the signed previous main and receipt", { timeout: 20000 }, async t => {
+  const f = mainFixture(t), first = await f.record(); assert.equal(first.code, 0);
+  acceptCommandPackage(f.db, command(f.db, f.binding, "next-main"));
+  f.acceptance.ledger = withCommandReleaseCheckpoint(f.db, f.binding, value => value);
+  f.acceptance.previousReceipt = first.result.receiptObject;
+  f.acceptance.baseMain = f.main;
+  f.acceptance.mainCommit = f.commit(f.main);
+  f.git(["update-ref", "refs/heads/main", f.acceptance.mainCommit]);
+  const next = await f.record(); assert.equal(next.code, 0);
+  assert.equal(f.git(["rev-parse", "refs/janseon/main-acceptance"]), next.result.receiptObject);
+  const envelope = JSON.parse(f.git(["cat-file", "blob", next.result.receiptObject]));
+  assert.equal(envelope.payload.previousReceipt, first.result.receiptObject);
+  assert.equal(envelope.payload.ledger.sequence, 2);
 });
