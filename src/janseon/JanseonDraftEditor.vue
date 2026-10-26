@@ -54,7 +54,7 @@ async function reopen(event: Event) {
 }
 </script>
 <template>
-  <section class="space-y-4 rounded-xl border p-5" data-testid="draft-editor">
+  <section class="min-w-0 space-y-4 rounded-xl border p-3 sm:p-5" data-testid="draft-editor">
     <h2 class="text-xl font-semibold">Draft changes · client only</h2>
     <p class="text-muted-foreground text-sm">Stage authored entity locations against this pinned base. Reference data stays unchanged. Review approval remains external.</p>
     <JanseonMapCanvas :snapshot="snapshot" :operations="operations" @move="move" />
@@ -62,7 +62,7 @@ async function reopen(event: Event) {
     <p v-else class="text-muted-foreground text-sm">Select an authored entity to stage a location.</p>
     <div class="flex flex-wrap gap-3"><Button data-testid="save-draft" variant="outline" @click="save">Save draft session</Button><Button data-testid="reopen-draft" variant="outline" @click="input?.click()">Reopen draft session</Button><Button data-testid="clear-draft" variant="ghost" @click="operations = []">Clear staged edits</Button><input ref="input" data-testid="draft-file" type="file" accept=".json" class="hidden" @change="reopen" /></div>
     <p v-if="error" data-testid="draft-error" role="alert" class="text-destructive font-mono text-sm">{{ error }}</p>
-    <div class="grid gap-4 lg:grid-cols-2"><div><h3 class="font-medium">Draft vs base ({{ operations.length }})</h3><pre data-testid="draft-diff" class="bg-muted mt-2 max-h-80 overflow-auto rounded p-3 text-xs whitespace-pre-wrap break-all">{{ JSON.stringify(diff, null, 2) }}</pre></div><div><h3 class="font-medium">Accumulated command preview</h3><pre data-testid="draft-command" class="bg-muted mt-2 max-h-80 overflow-auto rounded p-3 text-xs whitespace-pre-wrap break-all">{{ JSON.stringify(command, null, 2) }}</pre></div></div>
+    <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2"><div class="min-w-0"><h3 class="font-medium">Draft vs base ({{ operations.length }})</h3><pre data-testid="draft-diff" class="bg-muted mt-2 max-w-full max-h-80 overflow-auto rounded p-3 text-xs whitespace-pre-wrap break-all">{{ JSON.stringify(diff, null, 2) }}</pre></div><div class="min-w-0"><h3 class="font-medium">Accumulated command preview</h3><pre data-testid="draft-command" class="bg-muted mt-2 max-w-full max-h-80 overflow-auto rounded p-3 text-xs whitespace-pre-wrap break-all">{{ JSON.stringify(command, null, 2) }}</pre></div></div>
     <JanseonCommandSubmit :command="command" />
   </section>
 </template>
