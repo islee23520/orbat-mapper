@@ -39,7 +39,7 @@ export function verifyRelease(directory, context) {
   return { ...ids, ledger: manifest.provenance.ledger ?? null, files };
 }
 
-function readRegister(store, allowMissing = false) {
+export function readRegister(store, allowMissing = false) {
   absolute(store);
   if (!existsSync(store)) { if (allowMissing) return []; fail("RETENTION_STORE_MISSING", store); }
   if (!lstatSync(store).isFile() || lstatSync(store).isSymbolicLink()) fail("RETENTION_STORE_TYPE", store);
