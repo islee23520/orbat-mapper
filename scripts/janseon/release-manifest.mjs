@@ -101,7 +101,14 @@ function inspect(input, context, complete) {
     exact(member.license, ["id", "textSha256"]); text(member.license.id); hash(member.license.textSha256);
     hash(member.identitySnapshotSha256); refs(member.editionRefs);
   });
-  exact(p, ["sourceCommit", "snapshot", "exporter", "identityReceipt", "sourceReceipts", "approvalReceipts", "budgetReceipt", "memberLocations"]);
+  exact(p, ["sourceCommit", "snapshot", "exporter", "identityReceipt", "sourceReceipts", "approvalReceipts", "budgetReceipt", "memberLocations", ...(Object.hasOwn(p, "ledger") ? ["ledger"] : [])]);
+  if (Object.hasOwn(p, "ledger")) {
+    exact(p.ledger, ["datasetId", "sequence", "generationId", "editionId", "mapSemanticSha256", "contextSha256", "commandLogSha256"]);
+    text(p.ledger.datasetId); text(p.ledger.editionId);
+    shape(Number.isSafeInteger(p.ledger.sequence) && p.ledger.sequence >= 0, "ledger sequence");
+    for (const key of ["generationId", "mapSemanticSha256", "contextSha256", "commandLogSha256"]) hash(p.ledger[key]);
+    reference(s.editions.some(e => e.domain === "initial-state" && e.datasetId === p.ledger.datasetId && e.editionId === p.ledger.editionId), "ledger edition");
+  }
   commit(p.sourceCommit);
   exact(p.snapshot, ["contentId", "databaseSha256", "mapSemanticSha256"]);
   opaque(p.snapshot.contentId); hash(p.snapshot.databaseSha256); hash(p.snapshot.mapSemanticSha256);

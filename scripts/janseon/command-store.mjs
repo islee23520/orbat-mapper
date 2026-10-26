@@ -83,6 +83,23 @@ export function readCommandReleaseSource(db, binding) {
   });
 }
 
+/** Reserve the sole writer until the checkpoint consumer finishes. No acceptance. */
+export function withCommandReleaseCheckpoint(db, binding, consume) {
+  return transaction(db, true, () => {
+    const datasetId = binding.context.authored.datasetId;
+    const head = db.prepare("SELECT * FROM map_command_head WHERE dataset_id=?").get(datasetId);
+    const count = db.prepare("SELECT count(*) n FROM map_command_log WHERE dataset_id=?").get(datasetId).n;
+    if (head && count > head.sequence) fail("E_RELEASE_UNAPPLIED_COMMANDS");
+    const state = current(db, binding);
+    const rows = db.prepare("SELECT command_json,review_json FROM map_command_log WHERE dataset_id=? ORDER BY sequence").all(datasetId);
+    const log = { schema: "janseon-command-log.v1", contextSha256: state.contextSha256,
+      commands: rows.map(row => ({ commandPackage: JSON.parse(row.command_json), review: JSON.parse(row.review_json) })) };
+    return consume({ datasetId, sequence: state.head.sequence, generationId: state.head.generation_id,
+      editionId: state.head.edition_id, mapSemanticSha256: state.head.map_semantic_sha256,
+      contextSha256: state.contextSha256, commandLogSha256: semanticDigest(log) });
+  });
+}
+
 /** Editor head and typed references share the same verified read transaction. */
 export function readCommandEditorSource(db, binding) {
   return transaction(db, false, () => {
