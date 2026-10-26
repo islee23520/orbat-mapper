@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { canonical, type ReadSnapshot } from "./editorReadModel";
 import { draftCommand, stageLocation, saveDraftSession, reopenDraftSession, type DraftOperation, type Entity } from "./draftSession";
 import JanseonCommandSubmit from "./JanseonCommandSubmit.vue";
+import JanseonMapCanvas from "./JanseonMapCanvas.vue";
 const props = defineProps<{ snapshot: ReadSnapshot; entity: Entity | null }>();
 const emit = defineEmits<{ settled: [] }>();
 const operations = ref<DraftOperation[]>([]);
@@ -18,13 +19,20 @@ const command = computed(() => draftCommand(props.snapshot, operations.value));
 const diff = computed(() => operations.value.map(op => ({ ref: op.args.entityRef,
   before: props.snapshot.authored.entities.find(e => canonical(e.ref) === canonical(op.args.entityRef))?.location,
   after: op.args.location })));
+function stageEntity(entity: Entity, lon: number, lat: number) {
+  const op = stageLocation(props.snapshot, entity, lon, lat);
+  const next = operations.value.filter(row => canonical(row.args.entityRef) !== canonical(op.args.entityRef));
+  if (canonical(entity.location) !== canonical(op.args.location)) next.push(op);
+  operations.value = next; error.value = "";
+}
+function move(entity: Entity, lon: number, lat: number) {
+  try { stageEntity(entity, lon, lat); }
+  catch (e) { error.value = e instanceof Error ? e.message : "DRAFT_REJECTED"; }
+}
 function stage() {
   try {
     if (!props.entity || !String(longitude.value).trim() || !String(latitude.value).trim()) throw Error("DRAFT_COORDINATE");
-    const op = stageLocation(props.snapshot, props.entity, Number(longitude.value), Number(latitude.value));
-    const next = operations.value.filter(row => canonical(row.args.entityRef) !== canonical(op.args.entityRef));
-    if (canonical(props.entity.location) !== canonical(op.args.location)) next.push(op);
-    operations.value = next; error.value = "";
+    stageEntity(props.entity, Number(longitude.value), Number(latitude.value));
   } catch (e) { error.value = e instanceof Error ? e.message : "DRAFT_REJECTED"; }
 }
 async function save() {
@@ -49,6 +57,7 @@ async function reopen(event: Event) {
   <section class="space-y-4 rounded-xl border p-5" data-testid="draft-editor">
     <h2 class="text-xl font-semibold">Draft changes · client only</h2>
     <p class="text-muted-foreground text-sm">Stage authored entity locations against this pinned base. Reference data stays unchanged. Review approval remains external.</p>
+    <JanseonMapCanvas :snapshot="snapshot" :operations="operations" @move="move" />
     <div v-if="entity" class="flex flex-wrap items-end gap-3"><label class="text-sm">Longitude<input v-model="longitude" data-testid="draft-longitude" type="number" step="any" class="bg-background mt-1 block w-36 rounded border p-2" /></label><label class="text-sm">Latitude<input v-model="latitude" data-testid="draft-latitude" type="number" step="any" class="bg-background mt-1 block w-36 rounded border p-2" /></label><Button data-testid="stage-edit" @click="stage">Stage location</Button></div>
     <p v-else class="text-muted-foreground text-sm">Select an authored entity to stage a location.</p>
     <div class="flex flex-wrap gap-3"><Button data-testid="save-draft" variant="outline" @click="save">Save draft session</Button><Button data-testid="reopen-draft" variant="outline" @click="input?.click()">Reopen draft session</Button><Button data-testid="clear-draft" variant="ghost" @click="operations = []">Clear staged edits</Button><input ref="input" data-testid="draft-file" type="file" accept=".json" class="hidden" @change="reopen" /></div>

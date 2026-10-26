@@ -5,6 +5,7 @@ import { webcrypto } from "node:crypto";
 import JanseonDraftEditor from "./JanseonDraftEditor.vue";
 import { saveDraftSession, reopenDraftSession, stageLocation } from "./draftSession";
 import type { ReadSnapshot } from "./editorReadModel";
+vi.mock("./JanseonMapCanvas.vue", () => ({ default: { template: "<div />" } }));
 const save = vi.fn((_blob: Blob) => "blob:synthetic-draft");
 const snapshot = (): ReadSnapshot => ({ descriptor: { schema: "janseon-editor-edition-read.v1", readonly: true,
   head: { datasetId: "synthetic:a", editionId: "base", generationId: "a".repeat(64), sequence: 0, mapSemanticSha256: "b".repeat(64), identitySnapshotSha256: "c".repeat(64) }, members: [] },

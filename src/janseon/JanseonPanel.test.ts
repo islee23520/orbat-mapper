@@ -4,6 +4,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { webcrypto, createHash } from "node:crypto";
 import JanseonPanel from "./JanseonPanel.vue";
 import { canonical, loadReadSnapshot } from "./editorReadModel";
+vi.mock("./JanseonMapCanvas.vue", () => ({ default: { template: "<div />" } }));
 const copy = vi.fn();
 vi.mock("@vueuse/core", () => ({ useClipboard: () => ({ copy, copied: false }) }));
 const H = "a".repeat(64);
