@@ -6,10 +6,10 @@ import { initializeCommandStore, initializeCommandHead, readCommandEdition } fro
 const MODE = "janseon-command-store.v1", H = c => c.repeat(64);
 const person = { datasetId: "synthetic:identity", editionId: "i1", entityKind: "person", sourceId: "person-a" };
 export const station = id => ({ datasetId: "synthetic:shared", editionId: "one", entityKind: "graph-station", sourceId: id });
-export function fixture(t, path = ":memory:") {
+export function fixture(t, path = ":memory:", input = centralInputs()) {
   const db = new DatabaseSync(path); t.after(() => { if (db.isOpen) db.close(); });
   initializeCommandStore(db);
-  const input = centralInputs(); importCentralEditions(db, input, MODE);
+  importCentralEditions(db, input, MODE);
   const central = Object.fromEntries(Object.entries(input).map(([kind, value]) => [kind, {
     datasetId: value.expectedBinding.dataset_id, editionId: value.expectedBinding.edition_id, expectedBinding: value.expectedBinding }]));
   const snapshot = readCentralSnapshot(db, central, MODE);

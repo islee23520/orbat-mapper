@@ -10,12 +10,13 @@ import { canonicalEncode, semanticDigest } from "./canonical.mjs";
 import { readCommandReleaseSource } from "./command-store.mjs";
 import { buildMapRelease, verifyBuiltMapRelease } from "./build-map-release.mjs";
 import { createReleaseManifest } from "./release-manifest.mjs";
+import { centralInputs } from "./central-store-fixture.mjs";
 const H = c => c.repeat(64), sha = value => createHash("sha256").update(value).digest("hex");
 const paths = ["game/initial-world.json", "game/map-topology.json", "game/terrain-manifest.json", "game/world-graph.json",
   "wiki/map-core.json", "wiki/observed-geography.json", "wiki/spatial-assignments.json", "wiki/station-bindings.json", "wiki/underground-geometry.json"];
-function request(t) {
+function request(t, input) {
   const directory = mkdtempSync(join(tmpdir(), "release-builder-")); t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const databasePath = join(directory, "source.sqlite"), f = fixture(t, databasePath);
+  const databasePath = join(directory, "source.sqlite"), f = fixture(t, databasePath, input);
   const source = readCommandReleaseSource(f.db, f.binding);
   const ref = (domain, value) => ({ domain, datasetId: value.datasetId, editionId: value.editionId });
   const sourceRows = [{ editionRef: ref("graph", source.central.graph), rowsSha256: semanticDigest(source.central.graph.document) },
@@ -79,4 +80,16 @@ test("WAL source requires an explicit checkpointed snapshot instead of hashing o
   try { db.exec("PRAGMA journal_mode=WAL"); } finally { db.close(); }
   r.provenance.snapshot.databaseSha256 = sha(readFileSync(r.databasePath));
   assert.throws(() => buildMapRelease(r), { code: "E_BUILD_CHECKPOINT_REQUIRED" });
+});
+
+test("real builder preserves nonlexical source alias order in both native graph payloads", t => {
+  const input = centralInputs();
+  input.graph.document.aliases = { z: "é", a: "é" };
+  const bytes = Buffer.from(JSON.stringify(input.graph.document) + "\n");
+  Object.assign(input.graph.expectedBinding, { expected_source_sha256: sha(bytes), expected_document_sha256: sha(JSON.stringify(input.graph.document)), expected_byte_length: bytes.length });
+  Object.assign(input.graph.sourceReceipt, { source_sha256: sha(bytes), document_sha256: sha(JSON.stringify(input.graph.document)), byte_length: bytes.length });
+  const r = request(t, input), result = buildMapRelease(r);
+  assert.deepEqual(Object.entries(JSON.parse(result.members["wiki/map-core.json"]).data.aliases), Object.entries(input.graph.document.aliases));
+  assert.deepEqual(Object.entries(JSON.parse(result.members["game/world-graph.json"]).aliases), Object.entries(input.graph.document.aliases));
+  assert.deepEqual(verifyBuiltMapRelease(result, r), { mapReleaseId: result.manifest.mapReleaseId, deliveryReceiptId: result.manifest.deliveryReceiptId });
 });
