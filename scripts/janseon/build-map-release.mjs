@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { canonicalEncode, semanticDigest } from "./canonical.mjs";
-import { readCommandReleaseSource } from "./command-store.mjs";
+import { readCommandReleaseSource, readCommandEditorSource, exportCommandLog } from "./command-store.mjs";
 import { createReleaseManifest, validateReleaseManifest } from "./release-manifest.mjs";
 
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
@@ -55,6 +55,13 @@ export function buildMapRelease({ databasePath, binding, provenance, context, li
     // A database-byte receipt cannot stand in for uncheckpointed WAL content.
     if (db.prepare("PRAGMA journal_mode").get().journal_mode === "wal") fail("E_BUILD_CHECKPOINT_REQUIRED");
     source = readCommandReleaseSource(db, binding);
+    if (Object.hasOwn(provenance, "ledger")) {
+      const { head } = readCommandEditorSource(db, binding);
+      const ledger = { datasetId: source.authored.datasetId, sequence: head.sequence, generationId: head.generation_id,
+        editionId: head.edition_id, mapSemanticSha256: head.map_semantic_sha256, contextSha256: head.context_sha256,
+        commandLogSha256: semanticDigest(exportCommandLog(db, binding)) };
+      if (canonicalEncode(provenance.ledger) !== canonicalEncode(ledger)) fail("E_BUILD_LEDGER_BINDING");
+    }
   } finally { db.close(); }
   if (hash(readFileSync(databasePath)) !== hash(originalBytes)) fail("E_BUILD_SOURCE_CHANGED");
   const { central: c, authored: a } = source;
