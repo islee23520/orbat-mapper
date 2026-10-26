@@ -32,16 +32,16 @@ async function invoke(action: "package" | "apply") {
 }
 </script>
 <template>
-  <Card><CardHeader><CardTitle>Submit through the operator CLI</CardTitle></CardHeader><CardContent class="space-y-4">
+  <Card data-testid="command-submit" class="min-w-0"><CardHeader class="px-4 sm:px-6"><CardTitle>Submit through the operator CLI</CardTitle></CardHeader><CardContent class="min-w-0 space-y-4 px-4 sm:px-6">
     <p class="text-muted-foreground text-sm">The browser never opens the store. Start the local CLI bridge with an independently prepared binding and review. Packaging checks that review; this screen cannot grant it.</p>
-    <div class="grid gap-3 sm:grid-cols-2">
+    <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
       <label class="text-sm">Local bridge URL<input v-model="bridge" data-testid="bridge-url" class="bg-background mt-1 w-full rounded border p-2" /></label>
       <label class="text-sm">Operator session token<input v-model="token" data-testid="bridge-token" type="password" autocomplete="off" class="bg-background mt-1 w-full rounded border p-2" /></label>
       <label class="text-sm">Reviewed operation ID<input v-model="operationId" data-testid="operation-id" class="bg-background mt-1 w-full rounded border p-2" /></label>
       <label class="text-sm">Explicit authoritative store path<input v-model="authority" data-testid="authoritative-store" class="bg-background mt-1 w-full rounded border p-2 font-mono text-xs" /></label>
     </div>
-    <div class="flex flex-wrap gap-3"><Button data-testid="export-package" :disabled="busy || !command" @click="invoke('package')">Export reviewed command package</Button><Button data-testid="apply-cli" variant="outline" :disabled="busy || !transport || !authority" @click="invoke('apply')">Apply via CLI</Button></div>
+    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap"><Button data-testid="export-package" class="h-auto min-h-11 w-full max-w-full whitespace-normal py-2 sm:w-auto" :disabled="busy || !command" @click="invoke('package')">Export reviewed command package</Button><Button data-testid="apply-cli" class="h-auto min-h-11 w-full max-w-full whitespace-normal py-2 sm:w-auto" variant="outline" :disabled="busy || !transport || !authority" @click="invoke('apply')">Apply via CLI</Button></div>
     <p class="text-muted-foreground text-xs">Package download is not acceptance. Apply executes the existing CLI against only the operator-configured authority. Refresh the snapshot after success; stale snapshots are not rebased here.</p>
-    <pre v-if="output" data-testid="cli-output" aria-live="polite" class="bg-muted max-h-80 overflow-auto rounded p-3 text-xs whitespace-pre-wrap break-all">{{ JSON.stringify(output, null, 2) }}</pre>
+    <pre v-if="output" data-testid="cli-output" aria-live="polite" class="bg-muted min-w-0 max-w-full max-h-80 overflow-auto rounded p-3 text-xs whitespace-pre-wrap break-all">{{ JSON.stringify(output, null, 2) }}</pre>
   </CardContent></Card>
 </template>
