@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.seoul-dengoku.example/map-payload/v1/wiki-map-core.schema.json",
+  "title": "Draft wiki-map-core v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "janseon-wiki-map-core.v1"
+    },
+    "binding": {
+      "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/binding"
+    },
+    "origins": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/origin"
+      },
+      "minItems": 1
+    },
+    "data": {
+      "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/graph"
+    }
+  },
+  "required": [
+    "schema",
+    "binding",
+    "origins",
+    "data"
+  ],
+  "additionalProperties": false
+}
