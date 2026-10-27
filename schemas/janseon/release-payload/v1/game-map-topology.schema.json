@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.seoul-dengoku.example/map-payload/v1/game-map-topology.schema.json",
+  "title": "Draft game-map-topology v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "janseon-game-map-topology.v1"
+    },
+    "binding": {
+      "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/binding"
+    },
+    "origins": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/origin"
+      },
+      "minItems": 1
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "observedGeography": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/observed"
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/entity"
+          }
+        },
+        "geometries": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/overlay"
+          }
+        }
+      },
+      "required": [
+        "observedGeography",
+        "entities",
+        "geometries"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema",
+    "binding",
+    "origins",
+    "data"
+  ],
+  "additionalProperties": false
+}

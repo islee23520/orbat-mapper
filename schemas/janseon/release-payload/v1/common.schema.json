@@ -1,0 +1,1386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json",
+  "title": "Draft map-only release payload shared types v1",
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ref": {
+      "type": "object",
+      "properties": {
+        "datasetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "editionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entityKind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "datasetId",
+        "editionId",
+        "entityKind",
+        "sourceId"
+      ],
+      "additionalProperties": false
+    },
+    "edition": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "enum": [
+            "graph",
+            "observed-geography",
+            "initial-state",
+            "physical-rail",
+            "station-bindings",
+            "terrain",
+            "roads",
+            "buildings"
+          ]
+        },
+        "datasetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "editionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semanticSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "domain",
+        "datasetId",
+        "editionId",
+        "semanticSha256"
+      ],
+      "additionalProperties": false
+    },
+    "binding": {
+      "type": "object",
+      "properties": {
+        "mapSemanticSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "identitySnapshotSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "editions": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/edition"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "mapSemanticSha256",
+        "identitySnapshotSha256",
+        "editions"
+      ],
+      "additionalProperties": false
+    },
+    "receipt": {
+      "type": "object",
+      "properties": {
+        "contentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "contentId",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "point": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "line": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/point"
+      },
+      "minItems": 2
+    },
+    "ring": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/point"
+      },
+      "minItems": 4
+    },
+    "polygon": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ring"
+      },
+      "minItems": 1
+    },
+    "geometry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "Point"
+            },
+            "coordinates": {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/point"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "LineString"
+            },
+            "coordinates": {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/line"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "Polygon"
+            },
+            "coordinates": {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/polygon"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MultiPolygon"
+            },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/polygon"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "crs": {
+          "const": "OGC:CRS84"
+        },
+        "coordinates": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/point"
+        }
+      },
+      "required": [
+        "crs",
+        "coordinates"
+      ],
+      "additionalProperties": false
+    },
+    "overlayGeometry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "crs": {
+              "const": "OGC:CRS84"
+            },
+            "type": {
+              "const": "Point"
+            },
+            "coordinates": {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/point"
+            }
+          },
+          "required": [
+            "crs",
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "crs": {
+              "const": "OGC:CRS84"
+            },
+            "type": {
+              "const": "LineString"
+            },
+            "coordinates": {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/line"
+            }
+          },
+          "required": [
+            "crs",
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "crs": {
+              "const": "OGC:CRS84"
+            },
+            "type": {
+              "const": "Polygon"
+            },
+            "coordinates": {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/polygon"
+            }
+          },
+          "required": [
+            "crs",
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "crs": {
+              "const": "OGC:CRS84"
+            },
+            "type": {
+              "const": "MultiPolygon"
+            },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/polygon"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "crs",
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "origin": {
+      "type": "object",
+      "properties": {
+        "editionRef": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/edition"
+        },
+        "sourceSemanticSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceReceipt": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/receipt"
+        }
+      },
+      "required": [
+        "editionRef",
+        "sourceSemanticSha256",
+        "sourceReceipt"
+      ],
+      "additionalProperties": false
+    },
+    "station": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "nameKo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nameEn": {
+          "type": "string",
+          "minLength": 1
+        },
+        "district": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/location"
+        }
+      },
+      "required": [
+        "ref",
+        "nameKo",
+        "nameEn",
+        "district",
+        "location"
+      ],
+      "additionalProperties": false
+    },
+    "edge": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "a": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "b": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "sourceLocator": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "ref",
+        "a",
+        "b",
+        "sourceLocator"
+      ],
+      "additionalProperties": false
+    },
+    "alias": {
+      "type": "object",
+      "properties": {
+        "alias": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stationRef": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        }
+      },
+      "required": [
+        "alias",
+        "stationRef"
+      ],
+      "additionalProperties": false
+    },
+    "graph": {
+      "type": "object",
+      "properties": {
+        "districts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "stations": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/station"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/edge"
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/alias"
+          }
+        },
+        "evidenceReceipt": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/receipt"
+        }
+      },
+      "required": [
+        "districts",
+        "stations",
+        "edges",
+        "aliases",
+        "evidenceReceipt"
+      ],
+      "additionalProperties": false
+    },
+    "feature": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Feature"
+        },
+        "ref": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "dong",
+                "county",
+                "gu",
+                "city"
+              ]
+            },
+            "sourceEdition": {
+              "type": "string",
+              "minLength": 1
+            },
+            "officialCode": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "officialName": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dongId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "electoralDongId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "countyTitleId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "guId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "officialDongCodes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "jurisdictionGuRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "sourceEdition"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "dong"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "officialCode",
+                  "officialName",
+                  "dongId",
+                  "electoralDongId",
+                  "countyTitleId",
+                  "guId"
+                ],
+                "properties": {
+                  "officialCode": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "officialName": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "dongId": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "electoralDongId": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "countyTitleId": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "guId": {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "county"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "countyTitleId",
+                  "name",
+                  "officialDongCodes",
+                  "jurisdictionGuRefs"
+                ],
+                "properties": {
+                  "countyTitleId": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "name": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "officialDongCodes": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "jurisdictionGuRefs": {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "gu"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "guId",
+                  "name"
+                ],
+                "properties": {
+                  "guId": {
+                    "not": {
+                      "type": "null"
+                    }
+                  },
+                  "name": {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "city"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "officialCode"
+                ],
+                "properties": {
+                  "officialCode": {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "geometry": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "Polygon"
+                },
+                "coordinates": {
+                  "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/polygon"
+                }
+              },
+              "required": [
+                "type",
+                "coordinates"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "MultiPolygon"
+                },
+                "coordinates": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/polygon"
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "type",
+                "coordinates"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "ref",
+        "sourceId",
+        "properties",
+        "geometry"
+      ],
+      "additionalProperties": false
+    },
+    "slot": {
+      "type": "object",
+      "properties": {
+        "countyTitleId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "slotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dongId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jurisdictionGuRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "electoralDongId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fragmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceEdition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourcePointer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "geometryVerified": {
+          "type": "boolean"
+        },
+        "geometryRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+          }
+        },
+        "sourceRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "countyTitleId",
+        "slotId",
+        "dongId",
+        "name",
+        "jurisdictionGuRef",
+        "electoralDongId",
+        "fragmentId",
+        "sourceEdition",
+        "sourcePointer",
+        "geometryVerified",
+        "geometryRefs",
+        "sourceRefs"
+      ],
+      "additionalProperties": false
+    },
+    "observed": {
+      "type": "object",
+      "properties": {
+        "crs": {
+          "const": "OGC:CRS84"
+        },
+        "axisOrder": {
+          "const": "longitude-latitude"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/feature"
+          }
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/slot"
+          }
+        },
+        "baseDate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "legalSurveyCertification": {
+          "type": "boolean"
+        },
+        "current2026Geometry": {
+          "type": "boolean"
+        },
+        "archiveSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "crs",
+        "axisOrder",
+        "features",
+        "slots",
+        "baseDate",
+        "authority",
+        "legalSurveyCertification",
+        "current2026Geometry",
+        "archiveSha256"
+      ],
+      "additionalProperties": false
+    },
+    "entity": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "geographicParentRef": {
+          "anyOf": [
+            {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/location"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "footprint": {
+          "anyOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "crs": {
+                      "const": "OGC:CRS84"
+                    },
+                    "type": {
+                      "const": "Polygon"
+                    },
+                    "coordinates": {
+                      "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/polygon"
+                    }
+                  },
+                  "required": [
+                    "crs",
+                    "type",
+                    "coordinates"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "crs": {
+                      "const": "OGC:CRS84"
+                    },
+                    "type": {
+                      "const": "MultiPolygon"
+                    },
+                    "coordinates": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/polygon"
+                      },
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "crs",
+                    "type",
+                    "coordinates"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "geographicParentRef",
+        "location",
+        "footprint"
+      ],
+      "additionalProperties": false
+    },
+    "overlay": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "ownerRef": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "geometry": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/overlayGeometry"
+        }
+      },
+      "required": [
+        "ref",
+        "ownerRef",
+        "geometry"
+      ],
+      "additionalProperties": false
+    },
+    "assignment": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "placement",
+            "holder",
+            "owner",
+            "control"
+          ]
+        },
+        "subjectRef": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "valueRef": {
+          "anyOf": [
+            {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "subjectRef",
+        "valueRef"
+      ],
+      "additionalProperties": false
+    },
+    "edgeChange": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "baseEdgeRef": {
+          "anyOf": [
+            {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "a": {
+          "anyOf": [
+            {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "b": {
+          "anyOf": [
+            {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceReceipt": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/receipt"
+        }
+      },
+      "required": [
+        "ref",
+        "baseEdgeRef",
+        "a",
+        "b",
+        "sourceReceipt"
+      ],
+      "additionalProperties": false
+    },
+    "crosswalk": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "stationRef": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+        },
+        "facilityRef": {
+          "anyOf": [
+            {
+              "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceReceipt": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/receipt"
+        }
+      },
+      "required": [
+        "ref",
+        "stationRef",
+        "facilityRef",
+        "sourceReceipt"
+      ],
+      "additionalProperties": false
+    },
+    "authored": {
+      "type": "object",
+      "properties": {
+        "datasetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "editionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseCentralSemanticSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "identitySnapshotSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/entity"
+          }
+        },
+        "geometries": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/overlay"
+          }
+        },
+        "edgeChanges": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/edgeChange"
+          }
+        },
+        "crosswalkChanges": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/crosswalk"
+          }
+        },
+        "assignments": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/assignment"
+          }
+        },
+        "tombstones": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/ref"
+          }
+        },
+        "semanticSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "datasetId",
+        "editionId",
+        "baseCentralSemanticSha256",
+        "identitySnapshotSha256",
+        "entities",
+        "geometries",
+        "edgeChanges",
+        "crosswalkChanges",
+        "assignments",
+        "tombstones",
+        "semanticSha256"
+      ],
+      "additionalProperties": false
+    },
+    "unavailable": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "unavailable"
+        },
+        "decisionId": {
+          "enum": [
+            "UNSET-2",
+            "UNSET-3",
+            "UNSET-4"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "decisionId"
+      ],
+      "additionalProperties": false
+    },
+    "absent": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "absent"
+        },
+        "coverageReceipt": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/receipt"
+        }
+      },
+      "required": [
+        "status",
+        "coverageReceipt"
+      ],
+      "additionalProperties": false
+    },
+    "resourceAvailability": {
+      "oneOf": [
+        {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/absent"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "decisionId": {
+              "const": "UNSET-4"
+            }
+          },
+          "required": [
+            "status",
+            "decisionId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "stationBindings": {
+      "type": "object",
+      "properties": {
+        "baseline": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "const": "available"
+                },
+                "entries": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/crosswalk"
+                  }
+                }
+              },
+              "required": [
+                "status",
+                "entries"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "const": "unavailable"
+                },
+                "decisionId": {
+                  "const": "UNSET-2"
+                }
+              },
+              "required": [
+                "status",
+                "decisionId"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "authoredChanges": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/crosswalk"
+          }
+        },
+        "physicalRail": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "decisionId": {
+              "const": "UNSET-3"
+            }
+          },
+          "required": [
+            "status",
+            "decisionId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "baseline",
+        "authoredChanges",
+        "physicalRail"
+      ],
+      "additionalProperties": false
+    },
+    "underground": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "unavailable"
+        },
+        "decisionId": {
+          "const": "UNSET-3"
+        }
+      },
+      "required": [
+        "status",
+        "decisionId"
+      ],
+      "additionalProperties": false
+    },
+    "terrain": {
+      "type": "object",
+      "properties": {
+        "terrain": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/resourceAvailability"
+        },
+        "roads": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/resourceAvailability"
+        },
+        "buildings": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/resourceAvailability"
+        }
+      },
+      "required": [
+        "terrain",
+        "roads",
+        "buildings"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.seoul-dengoku.example/map-payload/v1/game-terrain-manifest.schema.json",
+  "title": "Draft game-terrain-manifest v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "janseon-game-terrain-manifest.v1"
+    },
+    "binding": {
+      "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/binding"
+    },
+    "origins": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/origin"
+      },
+      "minItems": 1
+    },
+    "data": {
+      "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/terrain"
+    }
+  },
+  "required": [
+    "schema",
+    "binding",
+    "origins",
+    "data"
+  ],
+  "additionalProperties": false
+}

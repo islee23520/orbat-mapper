@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.seoul-dengoku.example/map-payload/v1/game-world-graph.schema.json",
+  "title": "Draft game-world-graph v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "janseon-game-world-graph.v1"
+    },
+    "binding": {
+      "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/binding"
+    },
+    "origins": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/origin"
+      },
+      "minItems": 1
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "graph": {
+          "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/graph"
+        },
+        "edgeChanges": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.seoul-dengoku.example/map-payload/v1/common.schema.json#/$defs/edgeChange"
+          }
+        }
+      },
+      "required": [
+        "graph",
+        "edgeChanges"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema",
+    "binding",
+    "origins",
+    "data"
+  ],
+  "additionalProperties": false
+}
